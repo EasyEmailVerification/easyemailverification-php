@@ -1,77 +1,38 @@
 <?php
+
 /**
- * EasyEmailVerificationClient
+ * Backward-compatible wrapper for code written for the first version of this SDK.
+ * New code should use EasyEmailVerification\Client, which throws EEVException on errors.
  *
- * PHP client to interact with the Easy Email Verification API.
- * 
- * Example usage:
- * 
- *   $client = new EasyEmailVerificationClient("your_api_key_here");
- *   $result = $client->verifyEmail("support@example.com");
- *   print_r($result);
- * 
- * Docs: https://eev.stoplight.io/docs/eev/902yv4tm9bfd9-easy-email-verification-api
- * Site: https://www.easyemailverification.com
+ * @deprecated use EasyEmailVerification\Client
  */
+class EasyEmailVerificationClient
+{
+    private \EasyEmailVerification\Client $client;
 
-class EasyEmailVerificationClient {
-    private string $apiKey;
-    private string $baseUrl = "https://api.easyemailverification.com/v1";
-
-    /**
-     * Constructor
-     *
-     * @param string $apiKey Your Easy Email Verification API key.
-     */
-    public function __construct(string $apiKey) {
-        $this->apiKey = $apiKey;
+    public function __construct(string $apiKey)
+    {
+        if (!class_exists(\EasyEmailVerification\Client::class)) {
+            // without Composer: load the classes next to this file
+            foreach (['EEVException', 'Bulk', 'Client'] as $c) {
+                require_once __DIR__ . '/EasyEmailVerification/' . $c . '.php';
+            }
+        }
+        $this->client = new \EasyEmailVerification\Client($apiKey);
     }
 
     /**
-     * Verify an email address using the Easy Email Verification API.
-     *
-     * @param string $email The email address to verify.
-     * @return array The decoded JSON response from the API.
+     * Verifies an email address. Returns the API response as an array; on errors it returns
+     * ['success' => false, 'message' => ..., 'http_code' => ...] instead of throwing, as before.
      */
-    public function verifyEmail(string $email): array {
-        $endpoint = sprintf("%s/verify?apikey=%s&email=%s", 
-            $this->baseUrl, 
-            urlencode($this->apiKey), 
-            urlencode($email)
-        );
-
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL => $endpoint,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_HTTPHEADER => [
-                "Accept: application/json"
-            ],
-            CURLOPT_TIMEOUT => 20
-        ]);
-
-        $response = curl_exec($ch);
-        $curlError = curl_error($ch);
-        curl_close($ch);
-
-        if ($curlError) {
-            return [
-                "success" => false,
-                "error" => "cURL Error: " . $curlError
-            ];
+    public function verifyEmail(string $email): array
+    {
+        try {
+            return $this->client->verify($email);
+        } catch (\EasyEmailVerification\EEVException $e) {
+            $body = $e->getBody();
+            return is_array($body) ? $body + ['success' => false]
+                : ['success' => false, 'message' => $e->getMessage(), 'http_code' => (string)$e->getStatus()];
         }
-
-        $decoded = json_decode($response, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            return [
-                "success" => false,
-                "error" => "Invalid JSON response",
-                "raw_response" => $response
-            ];
-        }
-
-        return $decoded;
     }
 }
-?>

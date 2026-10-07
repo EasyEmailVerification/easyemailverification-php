@@ -1,53 +1,31 @@
 <?php
 /**
- * Example: Single Email Verification
- * 
- * Demonstrates how to verify a single email address
- * using the EasyEmailVerificationClient class.
- *
- * Docs: https://eev.stoplight.io/docs/eev/902yv4tm9bfd9-easy-email-verification-api
- * Product: https://www.easyemailverification.com/email-checker
+ * Example: verify one address.
+ *   composer require easyemailverification/php-sdk
+ *   EEV_API_KEY=your_key php examples/single_check.php someone@example.com
+ * Without EEV_API_KEY it uses the public sandbox key (try valid@sandbox.easyemailverification.com).
  */
 
-require_once __DIR__ . '/../src/EasyEmailVerificationClient.php';
+require __DIR__ . '/../vendor/autoload.php';
 
-// 🔑 Replace with your actual API key
-$apiKey = "Replace with your actual API key";
+use EasyEmailVerification\Client;
+use EasyEmailVerification\EEVException;
 
-// 📨 Email to verify
-$emailToCheck = "support@example.com";
+$email = $argv[1] ?? 'valid@sandbox.easyemailverification.com';
+$eev = new Client(getenv('EEV_API_KEY') ?: Client::SANDBOX_API_KEY);
 
-// Create client
-$client = new EasyEmailVerificationClient($apiKey);
-
-// Call API
-$result = $client->verifyEmail($emailToCheck);
-
-// Print formatted result
-echo "=== Easy Email Verification - Single Check ===\n";
-echo "Email: " . $emailToCheck . "\n";
-echo "---------------------------------------------\n";
-
-// Handle missing or malformed responses
-if (!is_array($result) || empty($result)) {
-    echo "Error: No response received from the API.\n";
-    exit;
+try {
+    $r = $eev->verify($email);
+} catch (EEVException $e) {
+    fwrite(STDERR, 'Error ' . $e->getStatus() . ': ' . $e->getMessage() . "\n");
+    exit(1);
 }
 
-// Handle API or connection errors
-if (isset($result['success']) && $result['success'] === false) {
-    $message = $result['message'] ?? $result['error'] ?? 'Unknown error.';
-    $httpCode = $result['http_code'] ?? 'N/A';
-    echo "Error: " . $message . "\n";
-    echo "HTTP Code: " . $httpCode . "\n";
-    exit;
+echo "Email:        {$r['email']}\n";
+echo "Result:       {$r['result']} ({$r['reason']})\n";
+echo 'Safe to send: ' . ($r['safe_to_send'] ? 'yes' : 'no') . "\n";
+echo 'Disposable:   ' . ($r['disposable'] ? 'yes' : 'no') . ', catch-all: ' . ($r['accept_all'] ? 'yes' : 'no') . ', role: ' . ($r['role'] ? 'yes' : 'no') . "\n";
+if ($r['did_you_mean'] !== '') {
+    echo "Did you mean: {$r['did_you_mean']}\n";
 }
-
-// Print standard response
-echo "Status: " . ($result['status'] ?? 'unknown') . "\n";
-echo "Domain: " . ($result['domain'] ?? 'N/A') . "\n";
-echo "Disposable: " . (($result['is_disposable'] ?? false) ? 'Yes' : 'No') . "\n";
-echo "Role-based: " . (($result['is_role_based'] ?? false) ? 'Yes' : 'No') . "\n";
-echo "---------------------------------------------\n";
-echo "Full Response:\n";
-print_r($result);
+echo 'Decision:     ' . Client::decide($r) . "\n";

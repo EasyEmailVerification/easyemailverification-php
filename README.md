@@ -1,116 +1,118 @@
-# 📨 Easy Email Verification PHP SDK
+# Easy Email Verification for PHP
 
-**Easy Email Verification – Email Checker** is a lightweight PHP SDK that allows developers to connect directly to the [Easy Email Verification API](https://eev.stoplight.io/docs/eev/902yv4tm9bfd9-easy-email-verification-api) and verify whether an email address is **real, active, and safe to use**.
+Official PHP client for the [Easy Email Verification API](https://www.easyemailverification.com/en-US/api): check whether email addresses exist and are safe to send to, one by one, in batches of 50 or as bulk lists of up to 16 MB. No email is sent to the addresses you verify.
 
-This SDK makes it simple to integrate the **[Email Checker](https://www.easyemailverification.com/email-checker)** into any PHP-based system — such as CRMs, signup forms, marketing platforms, or backend applications.
+- PHP 8.1+, only the `curl` and `json` extensions
+- Free sandbox key to test without an account or credits
 
----
-
-## 🔍 Features
-
-- ✅ Real-time email verification via REST API  
-- 🧠 Detects invalid, disposable, role-based, and risky addresses  
-- 🌐 Checks domain, MX records, and SMTP responses  
-- ⚙️ Easy-to-use PHP class for quick integration  
-- 🔑 API Key authentication  
-- 🧾 JSON response with detailed verification result  
-
----
-
-## 🧩 Official Distribution
-
-The **Email Checker PHP SDK** is officially distributed on **[SourceForge](https://sourceforge.net/projects/email-checker-php-sdk/)** — one of the most trusted open-source platforms in the world.
-
-[![Download on SourceForge](https://a.fsdn.com/con/app/sf-download-button)](https://sourceforge.net/projects/email-checker-php-sdk/)
-
-SourceForge provides a secure mirror for releases, public download statistics, and long-term availability for open-source software.  
-You can download the latest stable version or clone the GitHub repository for development.
-
----
-
-### 📦 Available Packages
-| Platform | Link | Description |
-|-----------|------|-------------|
-| **GitHub** | [github.com/marcelobrocardo/easyemailverification-php-sdk](https://github.com/marcelobrocardo/easyemailverification-php-sdk) | Development repository with full source code and examples. |
-| **SourceForge** | [sourceforge.net/projects/email-checker-php-sdk](https://sourceforge.net/projects/email-checker-php-sdk/) | Official distribution channel and stable releases. |
-
----
-
-## 🌐 Official Links
-
-| Resource | URL |
-|-----------|-----|
-| 🏠 Website | [https://www.easyemailverification.com](https://www.easyemailverification.com) |
-| 📬 Email Checker | [https://www.easyemailverification.com/email-checker](https://www.easyemailverification.com/email-checker) |
-| 🔗 Integrations | [https://www.easyemailverification.com/en-US/integrations](https://www.easyemailverification.com/en-US/integrations) |
-| 📘 API Documentation | [https://eev.stoplight.io/docs/eev/902yv4tm9bfd9-easy-email-verification-api](https://eev.stoplight.io/docs/eev/902yv4tm9bfd9-easy-email-verification-api) |
-
----
-
-## 💻 Installation
-
-Clone this repository:
+## Install
 
 ```bash
-git clone https://github.com/marcelobrocardo/easyemailverification-php-sdk.git
+composer require easyemailverification/php-sdk
 ```
 
-
----
-
-## 🧩 Usage Example
+## Quick start
 
 ```php
-<?php
-require_once "src/EasyEmailVerificationClient.php";
+use EasyEmailVerification\Client;
 
-$client = new EasyEmailVerificationClient("YOUR_API_KEY");
+// Use Client::SANDBOX_API_KEY to try it, or your own key (by default read from EEV_API_KEY)
+$eev = new Client(Client::SANDBOX_API_KEY);
 
-// Single email verification
-$result = $client->verifyEmail("test@example.com");
-
-print_r($result);
+$r = $eev->verify('valid@sandbox.easyemailverification.com');
+echo $r['result'], ' ', $r['reason'], "\n";   // valid accepted_email
+echo Client::decide($r), "\n";                  // accept
 ```
 
-Sample response:
+Get your API key in the dashboard under [API settings](https://dashboard.easyemailverification.com/apisettings) and keep it on the server, in the `EEV_API_KEY` environment variable. Never put it in browser code; for web forms use the [email verification widget](https://www.easyemailverification.com/en-US/email-verification-widget).
 
-```json
-{
-  "email": "support@example.com",
-  "result": "invalid",
-  "reason": "no_mx_record",
-  "disposable": false,
-  "accept_all": false,
-  "role": true,
-  "free": false,
-  "user": "support",
-  "domain": "example.com",
-  "mx_record": "",
-  "mx_domain": "",
-  "safe_to_send": false,
-  "did_you_mean": "support@gmail.com",
-  "success": true,
-  "message": null,
-  "http_code": "200"
+## Results
+
+Every verification returns `result` (`valid`, `invalid` or `unknown`), a `reason` and risk signals:
+
+| Field | Meaning |
+| --- | --- |
+| `result` | `valid`: the mail server accepted the mailbox. `invalid`: it will bounce. `unknown`: no reliable answer (not invalid). |
+| `reason` | Why, for example `accepted_email`, `rejected_email`, `invalid_domain`, `no_mx_record`, `timeout`. |
+| `safe_to_send` | Overall recommendation. `false` for invalid and unknown results, catch-all domains and disposable addresses. |
+| `did_you_mean` | Corrected address when a typo is detected (`gmial.com` → `gmail.com`), otherwise `''`. |
+| `disposable`, `accept_all`, `role`, `free` | Risk signals: temporary inbox, catch-all domain, role address (info@), free provider. |
+
+`Client::decide($r)` turns a result into `'accept'`, `'reject'`, `'suggest'` (show `did_you_mean`) or `'review'` (unknown, catch-all or disposable: your policy decides). Every result code is explained at [easyemailverification.com/en-US/help/result-codes](https://www.easyemailverification.com/en-US/help/result-codes).
+
+## Batch: up to 50 addresses
+
+```php
+foreach ($eev->verifyBatch(['anna@example.com', 'mark@gmial.com']) as $r) {
+    echo $r['email'], ' ', Client::decide($r), "\n";
 }
 ```
 
----
+## Bulk lists
 
+For files with thousands of addresses (TXT or CSV, one address per line, up to 16 MB). The account needs enough credits for every address. Bulk does not work with the sandbox key.
 
-## 📚 Learn More
+```php
+$job  = $eev->bulk->upload('leads.csv');           // a path; or upload($csvText, 'leads.csv', true)
+$done = $eev->bulk->wait($job['list_id']);         // polls until completed (or failed)
+if ($done['status'] === 'completed') {
+    $csv = $eev->bulk->download($job['list_id']);  // Email,Result,Reason,...,IsSafeToSend,DidYouMean,...
+}
+$eev->bulk->list();                                // all jobs of the account
+$eev->bulk->delete($job['list_id']);               // results are also deleted after 30 days
+```
 
-To explore other tools, connectors, and API integrations (such as **ActiveCampaign**, **Zapier**, **Zoho CRM**, **RD Station**, and more), visit:
+## Credits
 
-👉 [https://www.easyemailverification.com/en-US/integrations](https://www.easyemailverification.com/en-US/integrations)
+```php
+echo $eev->credits()['credits_remaining'];  // free call
+```
 
-For complete API endpoints and technical parameters, see:
+Each verified address uses one credit; unknown results do not. The free plan includes 50 verifications a day. See [pricing](https://www.easyemailverification.com/en-US/pricing).
 
-📘 [Easy Email Verification API Reference](https://eev.stoplight.io/docs/eev/902yv4tm9bfd9-easy-email-verification-api)
+## Errors
 
----
+API errors throw `EasyEmailVerification\EEVException` with the HTTP status and the API message:
 
+```php
+use EasyEmailVerification\EEVException;
 
-## 📄 License
+try {
+    $eev->verify('someone@example.com');
+} catch (EEVException $e) {
+    if ($e->getStatus() === 402) {
+        // no credits left
+    }
+}
+```
 
-MIT License © [Easy Email Verification](https://www.easyemailverification.com)
+| Status | Meaning |
+| --- | --- |
+| 400 | Missing key or parameter, or a non-sandbox address with the sandbox key |
+| 401 | Unknown key, or a widget-only key |
+| 402 | No credits left |
+| 404 | Bulk job not found |
+| 429 | Sandbox rate limit |
+| 0 | Raised by the client (network error, timeout, more than 50 addresses in a batch) |
+
+Do not retry verifications in a tight loop: a request that timed out may already have used a credit.
+
+## Upgrading from the first version
+
+`EasyEmailVerificationClient` still works as before (`verifyEmail()` returns an array and does not throw), now on top of the new client. New code should use `EasyEmailVerification\Client`.
+
+## Sandbox addresses
+
+With `Client::SANDBOX_API_KEY`, these addresses return fixed answers: `valid@`, `invalid@`, `unknown@`, `disposable@`, `catchall@`, `role@`, `quota@` (402) and `ratelimit@` (429) at `sandbox.easyemailverification.com`, plus `typo@gmial.com` (did you mean). Sandbox calls are limited to 60 per minute per IP.
+
+## Links
+
+- [Email verification API](https://www.easyemailverification.com/en-US/api) and [API reference](https://www.easyemailverification.com/en-US/api/reference)
+- [Validate email addresses in PHP](https://www.easyemailverification.com/en-US/guides/validate-email-php): filter_var and a mailbox check, without sending an email
+- [Mautic plugin](https://www.easyemailverification.com/en-US/guides/mautic)
+- Also distributed on [SourceForge](https://sourceforge.net/projects/email-checker-php-sdk/)
+- Support: support@easyemailverification.com
+
+## License
+
+MIT
